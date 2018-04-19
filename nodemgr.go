@@ -25,9 +25,39 @@ type ServiceConf struct {
 	MinHealthyRatio  float64  `json:"minHealthyRatio"`
 }
 
+func NewServiceConf() *ServiceConf {
+	return &ServiceConf{
+		Hosts:            make([]string, 0),
+		HealthyThreshold: 10,
+		MaxCooldownTime:  30,
+		MinHealthyRatio:  0.67,
+	}
+}
+
+func (sc *ServiceConf) AddHosts(hosts ...string) {
+	for _, h := range hosts {
+		sc.Hosts = append(sc.Hosts, h)
+	}
+}
+
 type ConfigJson struct {
-	WorkerCycle int                    `json:"workerCycle"`
-	Services    map[string]ServiceConf `json:"services"`
+	WorkerCycle int                     `json:"workerCycle"`
+	Services    map[string]*ServiceConf `json:"services"`
+}
+
+func NewConfigJson() *ConfigJson {
+	return &ConfigJson{
+		WorkerCycle: 1,
+		Services:    make(map[string]*ServiceConf),
+	}
+}
+
+func (cj *ConfigJson) AddService(name string, c *ServiceConf) {
+	if _, exists := cj.Services[name]; exists {
+		panic("nodemgr " + name + " service already exists")
+	}
+
+	cj.Services[name] = c
 }
 
 type NodeInfo struct {
@@ -61,7 +91,7 @@ type ServiceInfo struct {
 }
 
 type Nodemgr struct {
-	cfgJson     ConfigJson
+	cfgJson     *ConfigJson
 	allServices map[string]*ServiceInfo
 	workerRun   bool
 }
@@ -74,20 +104,20 @@ func (sr *SafeRand) intn(n int) (res int) {
 }
 
 func (nm *Nodemgr) Init(conf string) (err error) {
-	var c ConfigJson
+	c := NewConfigJson()
 	data, err := ioutil.ReadFile(conf)
 	if err != nil {
 		return err
 	}
 
-	if err = json.Unmarshal(data, &c); err != nil {
+	if err = json.Unmarshal(data, c); err != nil {
 		return
 	}
 
 	return nm.InitWithConfig(c)
 }
 
-func (nm *Nodemgr) InitWithConfig(conf ConfigJson) (err error) {
+func (nm *Nodemgr) InitWithConfig(conf *ConfigJson) (err error) {
 
 	nm.cfgJson = conf
 
@@ -391,6 +421,10 @@ func Init(conf string) error {
 	return nodemgr_default.Init(conf)
 }
 
+func InitWithConfig(conf *ConfigJson) (err error) {
+	return nodemgr_default.InitWithConfig(conf)
+}
+
 func Uninit() {
 	nodemgr_default.Uninit()
 }
@@ -413,8 +447,9 @@ func NewNodemgr() *Nodemgr {
 		return nodemgr_default
 	}
 
-	nm := new(Nodemgr)
-	nm.allServices = make(map[string]*ServiceInfo)
+	nm := &Nodemgr{
+		allServices: make(map[string]*ServiceInfo),
+	}
 
 	return nm
 }
