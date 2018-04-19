@@ -74,12 +74,22 @@ func (sr *SafeRand) intn(n int) (res int) {
 }
 
 func (nm *Nodemgr) Init(conf string) (err error) {
+	var c ConfigJson
 	data, err := ioutil.ReadFile(conf)
+	if err != nil {
+		return err
+	}
 
-	if err = json.Unmarshal(data, &nm.cfgJson); err != nil {
+	if err = json.Unmarshal(data, &c); err != nil {
 		return
 	}
-	//fmt.Println(nm.cfgJson)
+
+	return nm.InitWithConfig(c)
+}
+
+func (nm *Nodemgr) InitWithConfig(conf ConfigJson) (err error) {
+
+	nm.cfgJson = conf
 
 	if nm.cfgJson.WorkerCycle <= 0 {
 		return errors.New("conf WorkerCycle error")
