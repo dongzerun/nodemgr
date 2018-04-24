@@ -117,16 +117,22 @@ func (nm *Nodemgr) Init(conf string) (err error) {
 	return nm.InitWithConfig(c)
 }
 
+// 重入改造，允许多次串行初始化
 func (nm *Nodemgr) InitWithConfig(conf *ConfigJson) (err error) {
-
-	nm.cfgJson = conf
+	if nm.cfgJson == nil {
+		nm.cfgJson = conf
+	} else {
+		for name, service := range conf.Services {
+			nm.cfgJson.Services[name] = service
+		}
+	}
 
 	if nm.cfgJson.WorkerCycle <= 0 {
 		return errors.New("conf WorkerCycle error")
 	}
 
 	servicesCnt := 0
-	for sn, snConf := range nm.cfgJson.Services {
+	for sn, snConf := range conf.Services {
 		if snConf.HealthyThreshold < 3 {
 			return errors.New("conf HealthyThreshold error")
 		}
@@ -167,8 +173,10 @@ func (nm *Nodemgr) InitWithConfig(conf *ConfigJson) (err error) {
 		return errors.New("conf Services error")
 	}
 
-	nm.workerRun = true
-	go nodemgrWorker(nm)
+	if !nm.workerRun {
+		nm.workerRun = true
+		go nodemgrWorker(nm)
+	}
 
 	return
 }
